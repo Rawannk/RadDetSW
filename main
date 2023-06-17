@@ -1,0 +1,184 @@
+import os
+import keras 
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+import PIL.Image
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+plt.style.use('dark_background')
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder 
+import tkinter as tk
+from tkinter import *
+from tkinter import filedialog
+from PIL import ImageTk as itk, Image
+
+
+
+
+encoder = OneHotEncoder()
+encoder.fit([[0], [1]]) 
+
+# 0 - Tumor
+# 1 - Normal
+
+# This cell updates result list for images with tumor
+
+data = []
+paths = []
+result = []
+
+for r, d, f in os.walk(r'C:\Users\Balah\source\repos\PythonApplication3\PythonApplication3\archive (3)\brain_tumor_dataset\yes'):
+    for file in f:
+        if '.jpg' in file:
+            paths.append(os.path.join(r, file))
+
+for path in paths:
+    img = PIL.Image.open(path)
+    img = img.resize((128,128))
+    img = np.array(img)
+    if(img.shape == (128,128,3)): 
+        data.append(np.array(img))
+        result.append(encoder.transform([[0]]).toarray())
+
+# This cell updates result list for images without tumor
+
+paths = []
+for r, d, f in os.walk(r"C:\Users\Balah\source\repos\PythonApplication3\PythonApplication3\archive (3)\brain_tumor_dataset\no"):
+    for file in f:
+        if '.jpg' in file:
+            paths.append(os.path.join(r, file))
+
+for path in paths:
+    img = PIL.Image.open(path)
+    img = img.resize((128,128))
+    img = np.array(img)
+    if(img.shape == (128,128,3)):
+        data.append(np.array(img))
+        result.append(encoder.transform([[1]]).toarray())
+
+
+
+
+data = np.array(data)
+print (data.shape)
+
+
+
+
+result = np.array(result)
+result = result.reshape(133,2)
+
+x_train,x_test,y_train,y_test = train_test_split(data, result, test_size=0.2, shuffle=True, random_state=0)
+
+model = Sequential()
+
+model.add(Conv2D(32, kernel_size=(2, 2), input_shape=(128, 128, 3), padding = 'Same'))
+model.add(Conv2D(32, kernel_size=(2, 2),  activation ='relu', padding = 'Same'))
+
+
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+
+model.add(Conv2D(64, kernel_size = (2,2), activation ='relu', padding = 'Same'))
+model.add(Conv2D(64, kernel_size = (2,2), activation ='relu', padding = 'Same'))
+
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+model.add(Dropout(0.25))
+
+model.add(Flatten())
+
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(2, activation='softmax'))
+
+model.compile(loss = "categorical_crossentropy", optimizer='Adamax')
+print(model.summary())
+
+y_train.shape
+history = model.fit(x_train, y_train, epochs = 30, batch_size = 40, verbose = 1,validation_data = (x_test, y_test))
+
+def names(number):
+    if number==0:
+        return ' a Tumor'
+    else:
+        return 'not tumour'
+
+
+
+
+
+
+
+
+root = Tk()
+root.geometry("800x500")
+root.title("RadDet")
+root['bg']='#507293'
+
+
+frame1=Frame(root,bg = "white",bd=10,width=300,  
+             height=100,cursor = "target")  
+frame2=Frame(root,bg = "#507293",bd=10,width=250,  
+             height=600,cursor = "target")
+
+
+
+
+img=Image.open("C:/Users/Balah/source/repos/PythonApplication4/PythonApplication4/logo.jpg" )
+my_font1=('Oswald', 25)
+my_font2=('times', 15)
+
+
+resize=img.resize((200,60), Image.ANTIALIAS)
+
+myimage=itk.PhotoImage(resize)
+myimage2=itk.PhotoImage(file=r"C:/Users/Balah/source/repos/PythonApplication4/PythonApplication4/df1.jpg")
+
+frame1.grid(row=0, column=0,padx=0)
+l1=Label(frame1,image=myimage)
+l2=Label(root,text='Brain Tumor Detection', font=my_font1,fg='white', width=30,height=1, bg = "#507293",borderwidth=2, relief="groove")
+l3=Label(root,bg = "#507293")
+l4=Label(root,bg = "#507293",font=my_font2)
+
+
+l1.pack()
+
+
+l2.grid(row=0,column=1,padx=50,pady=10)
+l3.grid(row=2,column=1,padx=50,pady=10)
+l4.grid(row=3,column=1,padx=50,pady=10)
+
+
+btn_browse = tk.Button(root,text='Insert MRI Scan', width=200,height=100, image=myimage2,bg = "#507293")
+
+btn_browse.grid(row=2, column=0,padx=5,pady=90)
+
+
+
+def selectPic():
+    global img
+    filename = filedialog.askopenfilename(initialdir="/images", title="Select Image",
+                           filetypes=(("jpg images","*.jpg" ),("jpg images","*.jpg")))
+    img = Image.open(filename)
+    img = img.resize((200,150), Image.ANTIALIAS)
+
+    x = np.array(img.resize((128,128)))
+    x = x.reshape(1,128,128,3)
+    res = model.predict_on_batch(x)
+    classification = np.where(res == np.amax(res))[1][0]
+    g=str(res[0][classification]*100) + '% Confidence This Is ' + names(classification)
+    img = itk.PhotoImage(img)
+    l3['image'] = img
+    l4['text']=g
+      
+
+
+btn_browse['command'] = selectPic
+
+
+
+root.mainloop()
